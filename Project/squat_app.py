@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from squat_analyzer import SquatAnalyzer
 import numpy as np
 from collections import deque
+import pygame
+import time
 
 class SquatApp:
     def __init__(self, root):
@@ -41,6 +43,11 @@ class SquatApp:
         self.squat_count_label = tk.Label(self.root, text="Squat Count: 0", width=20)
         self.squat_count_label.grid(row=1, column=1, padx=5, pady=5)
 
+        # Checkbox for the sound
+        self.sound_checkbox_var = tk.BooleanVar()
+        self.sound_checkbox = tk.Checkbutton(self.root, text="Sound when valid squat is made", variable=self.sound_checkbox_var)
+        self.sound_checkbox.grid(row=2, column=0, padx=5, pady=5)
+
         # Femur angle label
         self.femur_angle_label = tk.Label(self.root, text="Femur Angle: N/A", width=20)
         self.femur_angle_label.grid(row=0, column=2, padx=5, pady=5)
@@ -51,7 +58,7 @@ class SquatApp:
 
         # Placeholder live view with instructions
         self.live_feed_label = tk.Label(self.root, text="Instructions:\n1. Marker 1 --> Hips\n2. Marker 2 --> Knee\n3. Marker 3 --> Ankle\n4. Marker 4 --> Weight\n5. Press 'Start' Button to start the measurement\n6. Ensure all markers are visible in the live view", bg="darkgrey", width=40, height=10)
-        self.live_feed_label.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+        self.live_feed_label.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
 
         # Knee angle graph (using Matplotlib) on the right side
         self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(3, 3))  # Two subplots
@@ -66,7 +73,7 @@ class SquatApp:
         self.ax2.set_ylabel("Handle Position / cm")
 
         self.knee_angle_canvas = FigureCanvasTkAgg(self.fig, master=self.root)
-        self.knee_angle_canvas.get_tk_widget().grid(row=2, column=2, rowspan=1, padx=5, pady=5, sticky="nsew")
+        self.knee_angle_canvas.get_tk_widget().grid(row=3, column=2, rowspan=1, padx=5, pady=5, sticky="nsew")
 
         # Configure column and row weights to ensure proper resizing
         self.root.grid_columnconfigure(0, weight=1)
@@ -92,6 +99,27 @@ class SquatApp:
             self.update_id = None  # Reset the update_id
 
         self.is_measuring = False
+
+    def play_beeb_sound(self):
+        """Play a beeb sound for a valid squat"""
+        pygame.mixer.init(frequency=44100, size=-16, channels=2)
+
+        # Generate a 440 Hz sine wave (A4 note)
+        sample_rate = 44100
+        duration = 1.0  # seconds
+        frequency = 440.0  # Frequency of the beeb sound
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        samples = (np.sin(2 * np.pi * frequency * t) * 32767).astype(np.int16)
+
+        # Create a stereo sound by duplicating the mono samples
+        stereo_samples = np.zeros((len(samples), 2), dtype=np.int16)
+        stereo_samples[:, 0] = samples  # Left channel
+        stereo_samples[:, 1] = samples  # Right channel
+
+        sound = pygame.sndarray.make_sound(stereo_samples)
+        sound.play()
+        time.sleep(1)
+        pygame.mixer.quit()
 
     def update_live_feed(self):
         """Update the live video feed with detected markers and update the GUI components."""
@@ -140,18 +168,24 @@ class SquatApp:
         if femur_angle is not None:
             if femur_angle < 0:  # Valid squat range
                 self.traffic_light_label.config(bg="green", text="Squat Valid")
-                if not self.squat_analyzer.squat_valid:  # If a new valid squat
+                if not self.squat_analyzer.squat_valid and self.squat_analyzer.squat_started:  # If a new valid squat
                     self.squat_counter += 1
+                    self.squat_analyzer.squat_started = False
                     self.squat_analyzer.squat_valid = True
                     self.squat_count_label.config(text=f"Squat Count: {self.squat_counter}")
+                    if self.sound_checkbox_var.get():
+                        self.play_beeb_sound()
             elif femur_angle <= 10:  # Close to valid
                 self.traffic_light_label.config(bg="yellow", text="Almost There")
+                self.squat_analyzer.squat_started = True
                 self.squat_analyzer.squat_valid = False
             else:  # Invalid squat
                 self.traffic_light_label.config(bg="red", text="Squat Invalid")
+                self.squat_analyzer.squat_started = True
                 self.squat_analyzer.squat_valid = False
         else:
             self.traffic_light_label.config(bg="red", text="No Squat Detected")
+            self.squat_analyzer.squat_started = False
             self.squat_analyzer.squat_valid = False
 
     def update_knee_angle_graph(self):

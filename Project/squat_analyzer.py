@@ -10,6 +10,7 @@ class SquatAnalyzer:
         self.play_sound = False  # Toggle sound feature
         self.femur_angle_threshold = 0  # Threshold for a valid squat
         self.squat_valid = False
+        self.squat_started = False
 
         # Histories for plots
         self.knee_angle_history = deque(maxlen=100)
@@ -20,7 +21,9 @@ class SquatAnalyzer:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         parameters = cv2.aruco.DetectorParameters()
-        corners, ids, rejected = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+        detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
+        # Detect the markers
+        corners, ids, rejected = detector.detectMarkers(gray)
         return corners, ids, rejected
 
     def calculate_femur_angle(self, corners, ids):
