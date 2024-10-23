@@ -28,6 +28,17 @@ class SquatApp:
 
     def setup_gui(self):
         """Initialize the GUI components."""
+
+        # Set the window size to match the screen resolution
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+    
+        # Set geometry to fill the screen
+        self.root.geometry(f"{screen_width}x{screen_height}")
+    
+        # Maximize window (keeps title bar and other controls)
+        self.root.state('zoomed')  # This works for Windows, on Linux it may have different effects
+
         # Start and Stop buttons
         self.start_button = tk.Button(self.root, text="Start", command=self.start_measurement)
         self.start_button.grid(row=0, column=0, padx=5, pady=5)
