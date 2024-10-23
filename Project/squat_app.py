@@ -72,7 +72,7 @@ class SquatApp:
         self.live_feed_label.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
 
         # Knee angle graph (using Matplotlib) on the right side
-        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(3, 3))  # Two subplots
+        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(4.5, 4))  # Two subplots
         self.fig.subplots_adjust(hspace=0.8) # Increase spacing between graphs 
         self.ax1.set_title("Knee Angle Over Time")
         self.ax1.set_xlabel("Time (frames)")
