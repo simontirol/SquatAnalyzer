@@ -15,7 +15,8 @@ class SquatApp:
         self.squat_analyzer = None  # Initialize as None
         self.squat_counter = 0
         self.is_measuring = False
-
+        self.initial_handle_position = None  # Track initial handle position
+        
         # Knee angle and handle position graph history
         self.knee_angle_history = deque(maxlen=100)
         self.handle_position_history = deque(maxlen=100)
@@ -54,11 +55,6 @@ class SquatApp:
         self.squat_count_label = tk.Label(self.root, text="Squat Count: 0", width=20)
         self.squat_count_label.grid(row=1, column=1, padx=5, pady=5)
 
-        # Checkbox for the sound
-        self.sound_checkbox_var = tk.BooleanVar()
-        self.sound_checkbox = tk.Checkbutton(self.root, text="Sound when valid squat is made", variable=self.sound_checkbox_var)
-        self.sound_checkbox.grid(row=2, column=0, padx=5, pady=5)
-
         # Femur angle label
         self.femur_angle_label = tk.Label(self.root, text="Femur Angle: N/A", width=20)
         self.femur_angle_label.grid(row=0, column=2, padx=5, pady=5)
@@ -66,6 +62,11 @@ class SquatApp:
         # Knee angle label
         self.knee_angle_label = tk.Label(self.root, text="Knee Angle: N/A", width=20)
         self.knee_angle_label.grid(row=1, column=2, padx=5, pady=5)
+
+        # Checkbox for the sound
+        self.sound_checkbox_var = tk.BooleanVar()
+        self.sound_checkbox = tk.Checkbutton(self.root, text="Sound when valid squat is made", variable=self.sound_checkbox_var)
+        self.sound_checkbox.grid(row=2, column=0, padx=5, pady=5)
 
         # Placeholder live view with instructions
         self.live_feed_label = tk.Label(self.root, text="Instructions:\n1. Marker 1 --> Hips\n2. Marker 2 --> Knee\n3. Marker 3 --> Ankle\n4. Marker 4 --> Weight\n5. Press 'Start' Button to start the measurement\n6. Ensure all markers are visible in the live view", bg="darkgrey", width=40, height=10)
@@ -89,7 +90,7 @@ class SquatApp:
         # Configure column and row weights to ensure proper resizing
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=1)
-        self.root.grid_rowconfigure(2, weight=1)
+        self.root.grid_rowconfigure(3, weight=1)
 
 
     def start_measurement(self):
@@ -104,6 +105,7 @@ class SquatApp:
             self.squat_analyzer.cap.release()  # Release the camera
             self.squat_analyzer = None
             self.squat_counter = 0  # Clean up
+            self.initial_handle_position = None  # Reset initial handle position
 
         if self.update_id:  # Check if there's an ongoing update
             self.root.after_cancel(self.update_id)  # Cancel the live feed update
@@ -158,7 +160,13 @@ class SquatApp:
                         self.update_knee_angle_graph()
 
                     if handle_position is not None:
-                        self.handle_position_history.append(handle_position)
+                        # Initialize the first handle position for relative movement
+                        if self.initial_handle_position is None:
+                            self.initial_handle_position = handle_position
+
+                        # Calculate the relative movement in the y-axis
+                        relative_movement = handle_position - self.initial_handle_position
+                        self.handle_position_history.append(relative_movement)
                         self.update_handle_position_graph()
 
                     # Squat validation
@@ -179,33 +187,23 @@ class SquatApp:
         if femur_angle is not None:
             if femur_angle < 0:  # Valid squat range
                 self.traffic_light_label.config(bg="green", text="Squat Valid")
-                if not self.squat_analyzer.squat_valid and self.squat_analyzer.squat_started:  # If a new valid squat
+                if not self.squat_analyzer.squat_valid and self.squat_analyzer.squat_started:  # Validate squat
                     self.squat_counter += 1
-                    self.squat_analyzer.squat_started = False
-                    self.squat_analyzer.squat_valid = True
                     self.squat_count_label.config(text=f"Squat Count: {self.squat_counter}")
+                    self.squat_analyzer.squat_valid = True
                     if self.sound_checkbox_var.get():
                         self.play_beeb_sound()
-            elif femur_angle <= 10:  # Close to valid
-                self.traffic_light_label.config(bg="yellow", text="Almost There")
-                self.squat_analyzer.squat_started = True
+            else:
+                self.traffic_light_label.config(bg="red", text="No Squat Detected")
                 self.squat_analyzer.squat_valid = False
-            else:  # Invalid squat
-                self.traffic_light_label.config(bg="red", text="Squat Invalid")
-                self.squat_analyzer.squat_started = True
-                self.squat_analyzer.squat_valid = False
-        else:
-            self.traffic_light_label.config(bg="red", text="No Squat Detected")
-            self.squat_analyzer.squat_started = False
-            self.squat_analyzer.squat_valid = False
 
     def update_knee_angle_graph(self):
         """Update the knee angle graph with the latest data."""
         self.ax1.clear()
-        self.ax1.plot(self.knee_angle_history, label="Knee Angle")
+        self.ax1.plot(self.knee_angle_history, label="Knee Angle", color="blue")
         self.ax1.set_title("Knee Angle Over Time")
         self.ax1.set_xlabel("Time / frames")
-        self.ax1.set_ylabel("Knee Angle / °")
+        self.ax1.set_ylabel("Angle / °")
         self.ax1.legend()
         self.knee_angle_canvas.draw()
 
@@ -215,6 +213,6 @@ class SquatApp:
         self.ax2.plot(self.handle_position_history, label="Handle Position", color="orange")
         self.ax2.set_title("Handle Position Over Time")
         self.ax2.set_xlabel("Time / frames")
-        self.ax2.set_ylabel("Handle Position / cm")
+        self.ax2.set_ylabel("Absolute Handle Movement / cm")
         self.ax2.legend()
         self.knee_angle_canvas.draw()

@@ -1,16 +1,16 @@
-# squat_analyzer.py
 import cv2
 import numpy as np
 from collections import deque
 
 class SquatAnalyzer:
     def __init__(self):
-        self.cap = cv2.VideoCapture(0)  # Re-add the camera capture here
+        self.cap = cv2.VideoCapture(0)  # Initialize the camera
         self.squat_count = 0
         self.play_sound = False  # Toggle sound feature
         self.femur_angle_threshold = 0  # Threshold for a valid squat
         self.squat_valid = False
         self.squat_started = False
+        self.previous_handle_y = None  # Store previous handle Y position for movement tracking
 
         # Histories for plots
         self.knee_angle_history = deque(maxlen=100)
@@ -55,16 +55,27 @@ class SquatAnalyzer:
         return None
 
     def get_handle_position(self, corners, ids):
-        """Get handle height using ArUco marker."""
+        """Get handle height in cm using ArUco marker and track movement."""
         if ids is None:
-            return None
+            return None, None
+
         ids_flat = ids.flatten()
         if 4 in ids_flat:
             handle_idx = list(ids_flat).index(4)
-            handle = corners[handle_idx][0][0]
-            return handle[1]  # Returning Y position (height)
-        return None
-    
+            handle_corners = corners[handle_idx][0]  # Corners of marker 4
+
+            # Calculate pixel-to-cm ratio based on marker size (5.7 cm)
+            marker_width_pixels = np.linalg.norm(handle_corners[0] - handle_corners[1])
+            pixels_per_cm = marker_width_pixels / 5.7
+
+            # Get the current Y position in pixels and convert to cm
+            current_y_pixels = handle_corners[0][1]
+            current_y_cm = current_y_pixels / pixels_per_cm
+
+            return current_y_cm
+
+        return None, None
+
     def draw_lines_between_markers(self, frame, corners, ids):
         """Draw lines connecting the hip, knee, and ankle markers."""
         if ids is None:

@@ -1,4 +1,3 @@
-# main.py
 from squat_app import SquatApp
 import tkinter as tk
 
