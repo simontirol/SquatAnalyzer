@@ -11,10 +11,10 @@ class SquatAnalyzer:
         self.squat_valid = False
         self.squat_started = False
         self.previous_handle_y = None  # Store previous handle Y position for movement tracking
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
 
-        # Histories for plots
         self.knee_angle_history = deque(maxlen=100)
-        self.handle_height_history = deque(maxlen=100)
+        self.handle_position_history = deque(maxlen=100)
 
     def detect_aruco_markers(self, frame):
         """Detect ArUco markers."""
@@ -57,7 +57,7 @@ class SquatAnalyzer:
     def get_handle_position(self, corners, ids):
         """Get handle height in cm using ArUco marker and track movement."""
         if ids is None:
-            return None, None
+            return None
 
         ids_flat = ids.flatten()
         if 4 in ids_flat:
@@ -74,7 +74,7 @@ class SquatAnalyzer:
 
             return current_y_cm
 
-        return None, None
+        return None
 
     def draw_lines_between_markers(self, frame, corners, ids):
         """Draw lines connecting the hip, knee, and ankle markers."""

@@ -20,6 +20,7 @@ class SquatApp:
         # Knee angle and handle position graph history
         self.knee_angle_history = deque(maxlen=100)
         self.handle_position_history = deque(maxlen=100)
+        self.time_history = deque(maxlen=100)
         
         # Store the after call ID
         self.update_id = None
@@ -29,7 +30,6 @@ class SquatApp:
 
     def setup_gui(self):
         """Initialize the GUI components."""
-
         # Set the window size to match the screen resolution
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -76,12 +76,12 @@ class SquatApp:
         self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(4.5, 4))  # Two subplots
         self.fig.subplots_adjust(hspace=0.8) # Increase spacing between graphs 
         self.ax1.set_title("Knee Angle Over Time")
-        self.ax1.set_xlabel("Time (frames)")
+        self.ax1.set_xlabel("Time (seconds)")
         self.ax1.set_ylabel("Knee Angle / °")
         
         # Handle position graph
         self.ax2.set_title("Handle Position Over Time")
-        self.ax2.set_xlabel("Time (frames)")
+        self.ax2.set_xlabel("Time (seconds)")
         self.ax2.set_ylabel("Handle Position / cm")
 
         self.knee_angle_canvas = FigureCanvasTkAgg(self.fig, master=self.root)
@@ -92,12 +92,35 @@ class SquatApp:
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(3, weight=1)
 
-
     def start_measurement(self):
         """Start the squat measurement."""
         self.squat_analyzer = SquatAnalyzer()  # Initialize SquatAnalyzer
         self.is_measuring = True
-        self.update_live_feed()  # Start the live feed update loop
+        self.start_time = time.time()  # Set the start time
+        
+        #Reset history for knee angle, handle position, and time
+        self.knee_angle_history = deque(maxlen=100)
+        self.handle_position_history = deque(maxlen=100)
+        self.time_history = deque(maxlen=100)
+
+        # Clear the graphs
+        self.ax1.clear()
+        self.ax2.clear()
+
+        #Reconfigure the plots with the updated labels and titles
+        self.ax1.set_title("Knee Angle Over Time")
+        self.ax1.set_xlabel("Time (seconds)")
+        self.ax1.set_ylabel("Knee Angle (°)")
+    
+        self.ax2.set_title("Handle Position Over Time")
+        self.ax2.set_xlabel("Time (seconds)")
+        self.ax2.set_ylabel("Handle Movement (cm)")
+    
+        # Redraw the canvas to reflect the changes
+        self.knee_angle_canvas.draw()
+
+        # Start the live feed update loop
+        self.update_live_feed() # Start the live feed update loop
 
     def stop_measurement(self):
         """Stop the squat measurement."""
@@ -112,27 +135,6 @@ class SquatApp:
             self.update_id = None  # Reset the update_id
 
         self.is_measuring = False
-
-    def play_beeb_sound(self):
-        """Play a beeb sound for a valid squat"""
-        pygame.mixer.init(frequency=44100, size=-16, channels=2)
-
-        # Generate a 440 Hz sine wave (A4 note)
-        sample_rate = 44100
-        duration = 1.0  # seconds
-        frequency = 440.0  # Frequency of the beeb sound
-        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-        samples = (np.sin(2 * np.pi * frequency * t) * 32767).astype(np.int16)
-
-        # Create a stereo sound by duplicating the mono samples
-        stereo_samples = np.zeros((len(samples), 2), dtype=np.int16)
-        stereo_samples[:, 0] = samples  # Left channel
-        stereo_samples[:, 1] = samples  # Right channel
-
-        sound = pygame.sndarray.make_sound(stereo_samples)
-        sound.play()
-        time.sleep(1)
-        pygame.mixer.quit()
 
     def update_live_feed(self):
         """Update the live video feed with detected markers and update the GUI components."""
@@ -157,8 +159,9 @@ class SquatApp:
                     if knee_angle is not None:
                         self.knee_angle_label.config(text=f"Knee Angle: {knee_angle:.2f}")
                         self.knee_angle_history.append(knee_angle)
-                        self.update_knee_angle_graph()
-
+                    else:
+                        self.knee_angle_history.append(self.knee_angle_history[-1])
+                        
                     if handle_position is not None:
                         # Initialize the first handle position for relative movement
                         if self.initial_handle_position is None:
@@ -167,7 +170,14 @@ class SquatApp:
                         # Calculate the relative movement in the y-axis
                         relative_movement = handle_position - self.initial_handle_position
                         self.handle_position_history.append(relative_movement)
-                        self.update_handle_position_graph()
+                    else:
+                        self.handle_position_history.append(self.handle_position_history[-1])
+                    
+                    # Append current time in seconds to time history
+                    self.time_history.append(time.time() - self.start_time)
+                    
+                    self.update_knee_angle_graph()
+                    self.update_handle_position_graph()
 
                     # Squat validation
                     self.update_traffic_light(femur_angle)
@@ -180,8 +190,29 @@ class SquatApp:
                 self.live_feed_label.config(image=imgtk)
 
         # Schedule the next update
-        self.update_id = self.root.after(5, self.update_live_feed)
+        self.update_id = self.root.after(33, self.update_live_feed)
 
+    def play_beeb_sound(self):
+        """Play a beeb sound for a valid squat"""
+        pygame.mixer.init(frequency=44100, size=-16, channels=2)
+
+        # Generate a 440 Hz sine wave (A4 note)
+        sample_rate = 44100
+        duration = 1.0  # seconds
+        frequency = 440.0  # Frequency of the beeb sound
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        samples = (np.sin(2 * np.pi * frequency * t) * 32767).astype(np.int16)
+
+        # Create a stereo sound by duplicating the mono samples
+        stereo_samples = np.zeros((len(samples), 2), dtype=np.int16)
+        stereo_samples[:, 0] = samples  # Left channel
+        stereo_samples[:, 1] = samples  # Right channel
+
+        sound = pygame.sndarray.make_sound(stereo_samples)
+        sound.play()
+        time.sleep(1)
+        pygame.mixer.quit()
+    
     def update_traffic_light(self, femur_angle):
         """Update the traffic light indicator based on femur angle."""
         if femur_angle is not None:
@@ -200,9 +231,9 @@ class SquatApp:
     def update_knee_angle_graph(self):
         """Update the knee angle graph with the latest data."""
         self.ax1.clear()
-        self.ax1.plot(self.knee_angle_history, label="Knee Angle", color="blue")
+        self.ax1.plot(self.time_history, self.knee_angle_history, label="Knee Angle", color="blue")
         self.ax1.set_title("Knee Angle Over Time")
-        self.ax1.set_xlabel("Time / frames")
+        self.ax1.set_xlabel("Time (seconds)")
         self.ax1.set_ylabel("Angle / °")
         self.ax1.legend()
         self.knee_angle_canvas.draw()
@@ -210,9 +241,9 @@ class SquatApp:
     def update_handle_position_graph(self):
         """Update the handle position graph with the latest data."""
         self.ax2.clear()
-        self.ax2.plot(self.handle_position_history, label="Handle Position", color="orange")
+        self.ax2.plot(self.time_history, self.handle_position_history, label="Handle Position", color="orange")
         self.ax2.set_title("Handle Position Over Time")
-        self.ax2.set_xlabel("Time / frames")
-        self.ax2.set_ylabel("Absolute Handle Movement / cm")
+        self.ax2.set_xlabel("Time (seconds)")
+        self.ax2.set_ylabel("Handle Movement / cm")
         self.ax2.legend()
         self.knee_angle_canvas.draw()
