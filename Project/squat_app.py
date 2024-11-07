@@ -17,11 +17,6 @@ class SquatApp:
         self.is_measuring = False
         self.initial_handle_position = None  # Track initial handle position
         
-        # Knee angle and handle position graph history
-        self.knee_angle_history = deque(maxlen=100)
-        self.handle_position_history = deque(maxlen=100)
-        self.time_history = deque(maxlen=100)
-        
         # Store the after call ID
         self.update_id = None
 
@@ -98,7 +93,7 @@ class SquatApp:
         self.is_measuring = True
         self.start_time = time.time()  # Set the start time
         
-        #Reset history for knee angle, handle position, and time
+        # Knee angle and handle position graph history
         self.knee_angle_history = deque(maxlen=100)
         self.handle_position_history = deque(maxlen=100)
         self.time_history = deque(maxlen=100)
@@ -159,8 +154,14 @@ class SquatApp:
                     if knee_angle is not None:
                         self.knee_angle_label.config(text=f"Knee Angle: {knee_angle:.2f}")
                         self.knee_angle_history.append(knee_angle)
-                    else:
+
+                    # Append the last known knee angle if available
+                    elif self.knee_angle_history:
                         self.knee_angle_history.append(self.knee_angle_history[-1])
+
+                    # If no previous knee angle exists, initialize with a default value (e.g., 0)
+                    else:
+                        self.knee_angle_history.append(0)
                         
                     if handle_position is not None:
                         # Initialize the first handle position for relative movement
@@ -170,8 +171,14 @@ class SquatApp:
                         # Calculate the relative movement in the y-axis
                         relative_movement = handle_position - self.initial_handle_position
                         self.handle_position_history.append(relative_movement)
-                    else:
+
+                    # Append the last known handle position if available
+                    elif self.handle_position_history:
                         self.handle_position_history.append(self.handle_position_history[-1])
+
+                    # If no previous handle position exists, initialize with a default value
+                    else:
+                        self.handle_position_history.append(0)
                     
                     # Append current time in seconds to time history
                     self.time_history.append(time.time() - self.start_time)
@@ -189,7 +196,7 @@ class SquatApp:
                 self.live_feed_label.imgtk = imgtk
                 self.live_feed_label.config(image=imgtk)
 
-        # Schedule the next update
+        # Schedule the next update every 33ms (1/fps) fps = 30
         self.update_id = self.root.after(33, self.update_live_feed)
 
     def play_beeb_sound(self):

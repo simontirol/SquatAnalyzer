@@ -11,10 +11,6 @@ class SquatAnalyzer:
         self.squat_valid = False
         self.squat_started = False
         self.previous_handle_y = None  # Store previous handle Y position for movement tracking
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-
-        self.knee_angle_history = deque(maxlen=100)
-        self.handle_position_history = deque(maxlen=100)
 
     def detect_aruco_markers(self, frame):
         """Detect ArUco markers."""
