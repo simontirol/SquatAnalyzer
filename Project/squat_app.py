@@ -16,7 +16,8 @@ class SquatApp:
         self.squat_counter = 0
         self.is_measuring = False
         self.initial_handle_position = None  # Track initial handle position
-        
+        self.squat_valid = False
+        self.squat_started = False
         # Store the after call ID
         self.update_id = None
 
@@ -71,12 +72,12 @@ class SquatApp:
         self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(4.5, 4))  # Two subplots
         self.fig.subplots_adjust(hspace=0.8) # Increase spacing between graphs 
         self.ax1.set_title("Knee Angle Over Time")
-        self.ax1.set_xlabel("Time (seconds)")
+        self.ax1.set_xlabel("Time / s")
         self.ax1.set_ylabel("Knee Angle / °")
         
         # Handle position graph
         self.ax2.set_title("Handle Position Over Time")
-        self.ax2.set_xlabel("Time (seconds)")
+        self.ax2.set_xlabel("Time / s")
         self.ax2.set_ylabel("Handle Position / cm")
 
         self.knee_angle_canvas = FigureCanvasTkAgg(self.fig, master=self.root)
@@ -104,12 +105,12 @@ class SquatApp:
 
         #Reconfigure the plots with the updated labels and titles
         self.ax1.set_title("Knee Angle Over Time")
-        self.ax1.set_xlabel("Time (seconds)")
-        self.ax1.set_ylabel("Knee Angle (°)")
+        self.ax1.set_xlabel("Time / s")
+        self.ax1.set_ylabel("Knee Angle / °")
     
         self.ax2.set_title("Handle Position Over Time")
-        self.ax2.set_xlabel("Time (seconds)")
-        self.ax2.set_ylabel("Handle Movement (cm)")
+        self.ax2.set_xlabel("Time / s")
+        self.ax2.set_ylabel("Handle Movement / cm")
     
         # Redraw the canvas to reflect the changes
         self.knee_angle_canvas.draw()
@@ -225,22 +226,32 @@ class SquatApp:
         if femur_angle is not None:
             if femur_angle < 0:  # Valid squat range
                 self.traffic_light_label.config(bg="green", text="Squat Valid")
-                if not self.squat_analyzer.squat_valid and self.squat_analyzer.squat_started:  # Validate squat
+                if not self.squat_valid and self.squat_started:  # If a new valid squat
                     self.squat_counter += 1
+                    self.squat_started = False
+                    self.squat_valid = True
                     self.squat_count_label.config(text=f"Squat Count: {self.squat_counter}")
-                    self.squat_analyzer.squat_valid = True
                     if self.sound_checkbox_var.get():
                         self.play_beeb_sound()
-            else:
-                self.traffic_light_label.config(bg="red", text="No Squat Detected")
-                self.squat_analyzer.squat_valid = False
+            elif femur_angle <= 10:  # Close to valid
+                self.traffic_light_label.config(bg="yellow", text="Almost There")
+                self.squat_started = True
+                self.squat_valid = False
+            else:  # Invalid squat
+                self.traffic_light_label.config(bg="red", text="Squat Invalid")
+                self.squat_started = True
+                self.squat_valid = False
+        else:
+            self.traffic_light_label.config(bg="red", text="No Squat Detected")
+            self.squat_started = False
+            self.squat_valid = False
 
     def update_knee_angle_graph(self):
         """Update the knee angle graph with the latest data."""
         self.ax1.clear()
         self.ax1.plot(self.time_history, self.knee_angle_history, label="Knee Angle", color="blue")
         self.ax1.set_title("Knee Angle Over Time")
-        self.ax1.set_xlabel("Time (seconds)")
+        self.ax1.set_xlabel("Time / s")
         self.ax1.set_ylabel("Angle / °")
         self.ax1.legend()
         self.knee_angle_canvas.draw()
@@ -250,7 +261,7 @@ class SquatApp:
         self.ax2.clear()
         self.ax2.plot(self.time_history, self.handle_position_history, label="Handle Position", color="orange")
         self.ax2.set_title("Handle Position Over Time")
-        self.ax2.set_xlabel("Time (seconds)")
+        self.ax2.set_xlabel("Time / s")
         self.ax2.set_ylabel("Handle Movement / cm")
         self.ax2.legend()
         self.knee_angle_canvas.draw()

@@ -8,8 +8,6 @@ class SquatAnalyzer:
         self.squat_count = 0
         self.play_sound = False  # Toggle sound feature
         self.femur_angle_threshold = 0  # Threshold for a valid squat
-        self.squat_valid = False
-        self.squat_started = False
         self.previous_handle_y = None  # Store previous handle Y position for movement tracking
 
     def detect_aruco_markers(self, frame):
@@ -36,19 +34,45 @@ class SquatAnalyzer:
             return angle
         return None
 
+
     def calculate_knee_angle(self, corners, ids):
-        """Calculate knee angle based on markers."""
+        """Calculate the knee angle between femur and shinbone based on markers."""
         if ids is None:
             return None
+        
         ids_flat = ids.flatten()
-        if 2 in ids_flat and 3 in ids_flat:
+        if 1 in ids_flat and 2 in ids_flat and 3 in ids_flat:
+            # Indices for the hip, knee, and ankle markers
+            hip_idx = list(ids_flat).index(1)
             knee_idx = list(ids_flat).index(2)
             ankle_idx = list(ids_flat).index(3)
+            
+            # Extract marker positions
+            hip = corners[hip_idx][0][0]
             knee = corners[knee_idx][0][0]
             ankle = corners[ankle_idx][0][0]
-            angle = np.degrees(np.arctan2(ankle[1] - knee[1], ankle[0] - knee[0]))
-            return angle
+            
+            # Vectors for femur and shinbone
+            femur_vector = knee - hip
+            shinbone_vector = ankle - knee
+            
+            # Calculate the angle between the vectors
+            dot_product = np.dot(femur_vector, shinbone_vector)
+            norm_femur = np.linalg.norm(femur_vector)
+            norm_shinbone = np.linalg.norm(shinbone_vector)
+            
+            if norm_femur == 0 or norm_shinbone == 0:
+                return None  # Avoid division by zero
+            
+            # Angle in radians
+            angle_radians = np.arccos(dot_product / (norm_femur * norm_shinbone))
+            
+            # Convert to degrees
+            angle_degrees = 180 - np.degrees(angle_radians)
+            return angle_degrees
+        
         return None
+
 
     def get_handle_position(self, corners, ids):
         """Get handle height in cm using ArUco marker and track movement."""
